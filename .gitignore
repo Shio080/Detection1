@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+dataset/
+*.pt
+*.onnx
+*.engine
+*.mp4
+*.jsonl

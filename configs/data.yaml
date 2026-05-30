@@ -1,0 +1,10 @@
+# Replace these paths with your dataset folders.
+# Expected label format: YOLO detection labels, one .txt per image:
+# class_id x_center y_center width height
+path: ./dataset
+train: images/train
+val: images/val
+
+names:
+  0: object_a
+  1: object_b
