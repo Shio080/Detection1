@@ -1,10 +1,38 @@
-# RT-DETR 实时摄像头目标检测
+# RT-DETR Real-Time Webcam Object Detection
 
-这个项目用 Python、OpenCV 和 Ultralytics RT-DETR 实现电脑摄像头实时目标检测与分类。默认使用 COCO 预训练权重 `rtdetr-l.pt`，第一次运行会自动下载模型。
+中文 | [English](#english)
 
-详细操作步骤见 `USAGE.md`。
+## 中文
 
-## 1. 创建环境
+这是一个基于 Python、OpenCV 和 Ultralytics RT-DETR 的实时摄像头目标检测项目。项目默认使用 COCO 预训练权重 `rtdetr-l.pt`，可以对摄像头画面中的人、车辆、手机、键盘、杯子等常见目标进行检测、分类并画出边界框。
+
+RT-DETR 是一种基于 Transformer 的实时目标检测模型。相比传统检测模型，它保留了 DETR 系列端到端检测的特点，同时更适合实时推理场景。
+
+详细中文使用说明见 [USAGE.md](USAGE.md)。
+
+### 功能特点
+
+- 实时调用电脑摄像头进行目标检测
+- 支持 GPU 和 FP16 半精度推理
+- 支持 COCO 预训练模型快速启动
+- 支持自定义数据集训练
+- 支持导出 ONNX / TensorRT 部署格式
+- 支持 ONNX 部署版脚本输出 JSONL 检测结果
+
+### 项目结构
+
+```text
+realtime_detect.py        开发/调试用实时摄像头检测脚本
+deploy_camera_onnx.py     ONNX 部署版摄像头检测脚本
+train_custom.py           自定义数据集训练脚本
+export_model.py           模型导出脚本
+configs/data.yaml         自定义数据集配置模板
+requirements.txt          开发和训练依赖
+requirements-deploy.txt   ONNX 部署依赖
+USAGE.md                  详细中文使用说明
+```
+
+### 环境安装
 
 建议使用 Python 3.10 或 3.11。
 
@@ -15,35 +43,27 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-如果你有 NVIDIA GPU，请按你的 CUDA 版本安装对应的 PyTorch，再安装本项目依赖。CPU 也能跑，但实时帧率会低很多。
+如果使用 NVIDIA GPU，请先安装与你的 CUDA 环境匹配的 PyTorch GPU 版本，再安装项目依赖。CPU 也可以运行，但实时帧率会明显低很多。
 
-## 2. 直接运行摄像头检测
+### 直接运行摄像头检测
 
 ```powershell
 python realtime_detect.py
 ```
 
-常用参数：
-
-```powershell
-python realtime_detect.py --model rtdetr-l.pt --source 0 --conf 0.4 --imgsz 416 --width 640 --height 480 --camera-fps 30 --target-fps 30
-```
-
-使用 GPU：
+使用 GPU 和 FP16：
 
 ```powershell
 python realtime_detect.py --device 0 --half
 ```
 
-默认配置已经按 30 FPS 优先做了优化：摄像头请求 `640x480 @ 30 FPS`，推理尺寸为 `416`。如果电脑有 NVIDIA CUDA，脚本会自动尝试使用 GPU 和 FP16。
-
-保存检测后的视频：
+常用实时参数：
 
 ```powershell
-python realtime_detect.py --save
+python realtime_detect.py --model rtdetr-l.pt --source 0 --conf 0.4 --imgsz 416 --width 640 --height 480 --camera-fps 30 --target-fps 30
 ```
 
-只检测部分类别，例如 COCO 里的 `person=0`：
+只检测指定类别，例如只检测人：
 
 ```powershell
 python realtime_detect.py --classes 0
@@ -51,9 +71,9 @@ python realtime_detect.py --classes 0
 
 按 `q` 或 `ESC` 退出窗口。
 
-## 3. 自定义数据训练
+### 训练自定义数据集
 
-把数据整理成 YOLO 检测格式：
+将数据集整理成 YOLO 检测格式：
 
 ```text
 dataset/
@@ -65,49 +85,33 @@ dataset/
     val/
 ```
 
-修改 `configs/data.yaml` 里的类别名称，然后运行：
+修改 `configs/data.yaml` 中的类别名称，然后运行：
 
 ```powershell
-python train_custom.py --data configs/data.yaml --model rtdetr-l.pt --epochs 50 --imgsz 640 --batch 8
+python train_custom.py --data configs/data.yaml --model rtdetr-l.pt --epochs 50 --imgsz 640 --batch 8 --device 0
 ```
 
-训练完成后，权重通常在：
+训练完成后的权重通常位于：
 
 ```text
 runs/train/rtdetr_custom/weights/best.pt
 ```
 
-用自定义权重实时检测：
-
-```powershell
-python realtime_detect.py --model runs/train/rtdetr_custom/weights/best.pt
-```
-
-## 4. 导出部署模型
+### 导出 ONNX / TensorRT
 
 导出 ONNX：
 
 ```powershell
-python export_model.py --model runs/train/rtdetr_custom/weights/best.pt --format onnx
+python export_model.py --model rtdetr-l.pt --format onnx --imgsz 416
 ```
 
-NVIDIA GPU 上导出 TensorRT：
+导出 TensorRT engine：
 
 ```powershell
-python export_model.py --model runs/train/rtdetr_custom/weights/best.pt --format engine --device 0 --half
+python export_model.py --model rtdetr-l.pt --format engine --device 0 --half --imgsz 416
 ```
 
-## 5. 调速建议
-
-- 帧率不够时，先降低 `--imgsz`，例如 `416` 或 `320`。
-- 摄像头分辨率可以降到 `--width 640 --height 480`。
-- 有 NVIDIA GPU 时使用 `--device 0 --half`。
-- 最终部署优先导出 TensorRT engine。
-- 如果仍达不到 30 FPS，说明主要瓶颈在模型推理速度，需要 GPU、TensorRT 或更小的输入尺寸。
-
-## 6. 正式 Python 部署
-
-部署版入口是 `deploy_camera_onnx.py`，它默认加载当前目录下的 `rtdetr-l.onnx`。
+### ONNX 部署运行
 
 安装部署依赖：
 
@@ -121,28 +125,147 @@ pip install -r requirements-deploy.txt
 python deploy_camera_onnx.py --model rtdetr-l.onnx --device 0
 ```
 
-如果画面里目标很多但显示太少，可以降低置信度阈值：
-
-```powershell
-python deploy_camera_onnx.py --model rtdetr-l.onnx --device 0 --conf 0.25 --max-det 300
-```
-
-部署脚本默认会逐个遍历检测框并分别画出类别和置信度。RT-DETR 导出的 ONNX 默认使用 `RTDETR` 加载；如果你的环境里加载失败，可以临时切回通用加载器：
-
-```powershell
-python deploy_camera_onnx.py --model rtdetr-l.onnx --device 0 --loader yolo
-```
-
-保存每帧检测结果为 JSONL：
+保存检测结果为 JSONL：
 
 ```powershell
 python deploy_camera_onnx.py --model rtdetr-l.onnx --device 0 --jsonl runs/deploy/detections.jsonl
 ```
 
-同时保存标注后的视频：
+### 模型文件说明
 
-```powershell
-python deploy_camera_onnx.py --model rtdetr-l.onnx --device 0 --save-video
+`.pt`、`.onnx`、`.engine` 等模型文件通常较大，默认不会上传到 GitHub。你可以在本地第一次运行时自动下载 `rtdetr-l.pt`，或通过 `export_model.py` 自行导出 ONNX / TensorRT 文件。
+
+---
+
+## English
+
+This project implements real-time webcam object detection with Python, OpenCV, and Ultralytics RT-DETR. It uses the COCO-pretrained `rtdetr-l.pt` model by default and can detect, classify, and draw bounding boxes for common objects such as people, vehicles, phones, keyboards, cups, and more.
+
+RT-DETR is a Transformer-based real-time object detector. It keeps the end-to-end detection style of the DETR family while being more practical for real-time inference.
+
+For the detailed Chinese guide, see [USAGE.md](USAGE.md).
+
+### Features
+
+- Real-time webcam object detection
+- GPU and FP16 inference support
+- Quick start with COCO-pretrained RT-DETR weights
+- Custom dataset training
+- ONNX and TensorRT export
+- ONNX deployment script with optional JSONL detection output
+
+### Project Structure
+
+```text
+realtime_detect.py        Real-time webcam detection script for development/testing
+deploy_camera_onnx.py     ONNX deployment script for webcam inference
+train_custom.py           Custom dataset training script
+export_model.py           Model export script
+configs/data.yaml         Dataset configuration template
+requirements.txt          Development and training dependencies
+requirements-deploy.txt   ONNX deployment dependencies
+USAGE.md                  Detailed Chinese usage guide
 ```
 
-这个入口适合长期运行或接入其他程序；训练、导出和实验参数调整则继续放在 `train_custom.py`、`export_model.py` 和 `realtime_detect.py` 里。
+### Installation
+
+Python 3.10 or 3.11 is recommended.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+If you have an NVIDIA GPU, install the PyTorch GPU build that matches your CUDA environment before installing the project dependencies. CPU inference also works, but real-time performance will be much lower.
+
+### Run Webcam Detection
+
+```powershell
+python realtime_detect.py
+```
+
+Run with GPU and FP16:
+
+```powershell
+python realtime_detect.py --device 0 --half
+```
+
+Common real-time settings:
+
+```powershell
+python realtime_detect.py --model rtdetr-l.pt --source 0 --conf 0.4 --imgsz 416 --width 640 --height 480 --camera-fps 30 --target-fps 30
+```
+
+Detect only selected classes, for example COCO class `person=0`:
+
+```powershell
+python realtime_detect.py --classes 0
+```
+
+Press `q` or `ESC` to quit the video window.
+
+### Train on a Custom Dataset
+
+Prepare the dataset in YOLO detection format:
+
+```text
+dataset/
+  images/
+    train/
+    val/
+  labels/
+    train/
+    val/
+```
+
+Edit class names in `configs/data.yaml`, then run:
+
+```powershell
+python train_custom.py --data configs/data.yaml --model rtdetr-l.pt --epochs 50 --imgsz 640 --batch 8 --device 0
+```
+
+The best checkpoint is usually saved at:
+
+```text
+runs/train/rtdetr_custom/weights/best.pt
+```
+
+### Export to ONNX / TensorRT
+
+Export to ONNX:
+
+```powershell
+python export_model.py --model rtdetr-l.pt --format onnx --imgsz 416
+```
+
+Export to TensorRT engine:
+
+```powershell
+python export_model.py --model rtdetr-l.pt --format engine --device 0 --half --imgsz 416
+```
+
+### Run ONNX Deployment
+
+Install deployment dependencies:
+
+```powershell
+pip install -r requirements-deploy.txt
+```
+
+Run ONNX webcam inference:
+
+```powershell
+python deploy_camera_onnx.py --model rtdetr-l.onnx --device 0
+```
+
+Save detection results as JSONL:
+
+```powershell
+python deploy_camera_onnx.py --model rtdetr-l.onnx --device 0 --jsonl runs/deploy/detections.jsonl
+```
+
+### Model Files
+
+Large model files such as `.pt`, `.onnx`, and `.engine` are ignored by Git by default. They are not uploaded to GitHub. You can download `rtdetr-l.pt` automatically on first run, or export ONNX / TensorRT files locally with `export_model.py`.
